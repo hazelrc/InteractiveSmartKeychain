@@ -7,11 +7,7 @@
 #include <WiFiManager.h>
 #include <time.h>
 
-// ================== PINS ==================
-int redPin   = 3;
-int greenPin = 2;
-int bluePin  = 1;
-
+// ================== BUTTON ==================
 #define BUTTON_PIN 4  // pressed = HIGH
 
 // ================== OLED ==================
@@ -21,11 +17,6 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 
 // RoboEyes instance
 RoboEyes eyes(display);
-
-// ================== RGB PRESETS ==================
-bool ledBlinkOn = false;
-unsigned long ledBlinkLast = 0;
-const unsigned long LED_BLINK_INTERVAL = 655;
 
 // ================== IDLE TIMING ==================
 unsigned long lastIdleChange = 0;
@@ -98,22 +89,6 @@ bool portalRunning = false;
 unsigned long portalStartMs = 0;
 const unsigned long PORTAL_MAX_MS = 180000; // 180s
 
-// ================== HELPERS ==================
-void setColor(int r, int g, int b) {
-  analogWrite(redPin, r);
-  analogWrite(greenPin, g);
-  analogWrite(bluePin, b);
-}
-
-void blinkColor(int r, int g, int b, unsigned long now) {
-  if (now - ledBlinkLast >= LED_BLINK_INTERVAL) {
-    ledBlinkLast = now;
-    ledBlinkOn = !ledBlinkOn;
-    if (ledBlinkOn) setColor(r, g, b);
-    else           setColor(0, 0, 0);
-  }
-}
-
 // ================== TEXT HELPERS ==================
 void drawCenterText(const String &line1, const String &line2 = "") {
   display.clearDisplay();
@@ -149,7 +124,7 @@ void drawStartupMessage() {
   display.display();
 }
 
-// ---- WiFi portal instruction screen (3 baris + hint exit) ----
+// ---- WiFi portal instruction screen ----
 void drawWifiPortalScreen() {
   display.clearDisplay();
   display.setTextColor(SSD1306_WHITE);
@@ -312,19 +287,14 @@ void pickNewIdle() {
   int r = random(0, 5); // 0..4
 
   if (r == 0) {
-    setColor(0, 10, 40);
     applyExpression(EXPR_IDLE_SLEEP);
   } else if (r == 1) {
-    setColor(255, 0, 30);
     applyExpression(EXPR_IDLE_LOVE);
   } else if (r == 2) {
-    setColor(255, 255, 0);
     applyExpression(EXPR_IDLE_SMILE);
   } else if (r == 3) {
-    setColor(120, 0, 255);
     applyExpression(EXPR_IDLE_SWEAT);
   } else {
-    setColor(40, 40, 40);
     applyExpression(EXPR_IDLE_SMILE);
     eyes.setMood(DEFAULT);
     eyes.setAutoblinker(true, 4, 2);
@@ -387,7 +357,6 @@ void drawClockScreen() {
 
 void startClockMode(unsigned long now) {
   if (WiFi.status() != WL_CONNECTED) {
-    setColor(255, 0, 0);
     drawCenterText("No WiFi", "Tap 4x for setup");
     delay(900);
     mode = MODE_IDLE;
@@ -396,10 +365,7 @@ void startClockMode(unsigned long now) {
     return;
   }
 
-  setColor(0, 255, 80);
-
   if (!ensureTimeSynced(8000)) {
-    setColor(255, 0, 0);
     drawCenterText("Time sync fail", "Check internet");
     delay(900);
     mode = MODE_IDLE;
@@ -417,7 +383,6 @@ void startClockMode(unsigned long now) {
 void startWifiManagerPortal() {
   mode = MODE_WIFI_PORTAL;
 
-  setColor(0, 0, 0);
   drawWifiPortalScreen();
 
   WiFi.mode(WIFI_STA);
@@ -427,26 +392,21 @@ void startWifiManagerPortal() {
   wm.setCaptivePortalEnable(true);
   wm.setCleanConnect(true);
 
-  // penting: non-blocking biar tombol masih kebaca
+  // non-blocking biar tombol masih kebaca
   wm.setConfigPortalBlocking(false);
 
   portalRunning = true;
   portalStartMs = millis();
 
-  // start portal (langsung return)
   wm.startConfigPortal("RoboEyes-Setup");
 }
 
-// keluar dari portal (cancel)
 void exitWifiPortalToIdle() {
-  // beberapa versi WiFiManager punya stopConfigPortal()
-  // kalau error compile, ganti jadi wm.stopWebPortal();
   wm.stopConfigPortal();
 
   portalRunning = false;
   mode = MODE_IDLE;
 
-  setColor(255, 0, 0);
   drawCenterText("Exit WiFi Setup", "");
   delay(600);
 
@@ -454,17 +414,14 @@ void exitWifiPortalToIdle() {
   lastIdleChange = millis();
 }
 
-// handle portal tiap loop
 void handleWifiPortal(unsigned long now) {
   if (!portalRunning) return;
 
-  wm.process(); // penting: jalanin webserver + captive portal
+  wm.process();
 
-  // kalau sudah connect
   if (WiFi.status() == WL_CONNECTED) {
     portalRunning = false;
 
-    setColor(0, 255, 0);
     display.clearDisplay();
     display.setTextColor(SSD1306_WHITE);
     display.setTextWrap(false);
@@ -487,9 +444,7 @@ void handleWifiPortal(unsigned long now) {
     ESP.restart();
   }
 
-  // timeout manual (biar pasti balik)
   if (now - portalStartMs >= PORTAL_MAX_MS) {
-    setColor(255, 0, 0);
     drawCenterText("WiFi Timeout", "");
     delay(600);
     exitWifiPortalToIdle();
@@ -510,22 +465,18 @@ void startFeedbackTap(int taps, unsigned long now) {
   mode = MODE_FEEDBACK;
 
   if (taps == 1) {
-    setColor(255, 255, 0);
     applyExpression(EXPR_WINK);
     feedbackUntil = now + 900;
   } else if (taps == 2) {
-    setColor(255, 0, 30);
     applyExpression(EXPR_SHY_LOVE);
     feedbackUntil = now + 2000;
   } else {
-    setColor(255, 0, 0);
     applyExpression(EXPR_CRY);
     feedbackUntil = now + 2000;
   }
 }
 
 void startFeedbackHold(unsigned long now) {
-  // biar aman: kalau lagi WiFi setup, ignore hold
   if (mode == MODE_WIFI_PORTAL) return;
 
   mode = MODE_FEEDBACK;
@@ -536,9 +487,6 @@ void startFeedbackHold(unsigned long now) {
 // ================== SETUP ==================
 void setup() {
   pinMode(BUTTON_PIN, INPUT_PULLDOWN); // pressed = HIGH (ESP32 aman)
-  pinMode(redPin, OUTPUT);
-  pinMode(greenPin, OUTPUT);
-  pinMode(bluePin, OUTPUT);
 
   randomSeed(micros());
 
@@ -547,7 +495,6 @@ void setup() {
   }
 
   drawStartupMessage();
-  setColor(255, 0, 30);
   delay(2000);
 
   eyes.begin(SCREEN_WIDTH, SCREEN_HEIGHT, 100);
@@ -586,10 +533,10 @@ void loop() {
     return;
   }
 
-  // ===== WIFI PORTAL MODE (non-blocking) =====
+  // ===== WIFI PORTAL MODE =====
   if (mode == MODE_WIFI_PORTAL) {
     handleWifiPortal(now);
-    // tetap lanjut baca tombol juga (biar 1 tap exit bisa kebaca)
+    // tetap lanjut baca tombol (biar 1 tap exit kebaca)
   }
 
   // ===== READ + DEBOUNCE =====
@@ -630,12 +577,6 @@ void loop() {
 
   // ===== MODE HANDLER =====
   if (mode == MODE_FEEDBACK) {
-    if (holdTriggered && stablePressed) {
-      blinkColor(255, 255, 0, now);
-      renderEyes(now);
-      return;
-    }
-
     if (now >= feedbackUntil) {
       mode = MODE_IDLE;
       holdTriggered = false;

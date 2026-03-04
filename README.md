@@ -101,8 +101,11 @@ Button is configured as **pressed = HIGH**.
 6. Use **5 taps** to display clock mode (WiFi required)
 
 ---
+
 ## 🔌 Hardware Wiring
 <img width="3000" height="2758" alt="Image" src="https://github.com/user-attachments/assets/436b2703-03d6-4617-bad4-5b4e88bf520a" />
+
+---
 
 ## 🎥 Demo Video
 https://github.com/user-attachments/assets/39e8fa40-d38d-435a-b0b3-ef0333c10ae5

@@ -105,4 +105,4 @@ Button is configured as **pressed = HIGH**.
 <img width="3000" height="2758" alt="Image" src="https://github.com/user-attachments/assets/436b2703-03d6-4617-bad4-5b4e88bf520a" />
 
 ## 🎥 Demo Video
-
+https://github.com/user-attachments/assets/1a70071f-62bd-4d78-a2a4-f08e3ce6b6b5
